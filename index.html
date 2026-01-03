@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>otakakotid</title>
+</head>
+
+<body>
+    <script>
+        const baseURL = "http://localhost:8080";
+
+        const bufferDecode = (value) => Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+
+        const bufferEncode = (value) => btoa(String.fromCharCode(...new Uint8Array(value))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+
+        const assertion = async () => {
+            const pre = await fetch(baseURL + "/assertion", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            })
+
+            if (pre.status !== 200) {
+                alert('Failed assertion initialize');
+
+                return;
+            }
+
+            const publicKey = await pre.json();
+
+            publicKey.challenge = bufferDecode(publicKey.challenge);
+
+            const credential = await navigator.credentials.get({
+                publicKey: publicKey,
+            })
+
+            const result = await fetch(baseURL + "/assertion", {
+                method: "POST",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    id: credential.id,
+                    rawId: bufferEncode(credential.rawId),
+                    type: credential.type,
+                    response: {
+                        authenticatorData: bufferEncode(credential.response.authenticatorData),
+                        clientDataJSON: bufferEncode(credential.response.clientDataJSON),
+                        signature: bufferEncode(credential.response.signature),
+                        userHandle: bufferEncode(credential.response.userHandle),
+                    },
+                }),
+            })
+
+            if (result.status === 200) {
+                window.location.replace(baseURL + '/callback');
+            } else {
+                alert('assertion failed');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            assertion();
+        });
+    </script>
+</body>
+
+</html>
